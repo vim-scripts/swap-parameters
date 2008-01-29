@@ -1,8 +1,8 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " swap_parameters.vim - swap parameters - fun(arg2, arg1, arg3)
 " Author: Kamil Dworakowski <kamil-at-dworakowski.name>
-" Version: 1.1
-" Last Change: 2007-09-28 
+" Version: 1.1.1
+" Last Change: 2008-01-29 
 " URL: http://blog.kamil.dworakowski.name
 " Requires: Python and Vim compiled with +python option
 " Licence: This script is released under the Vim License.
@@ -113,7 +113,7 @@ class LeftwardDirection(Direction):
         return True
 
 
-def findFirst(predicate, input, direction=None):
+def findFirst(predicate, input, direction=None, eolIsDelimiter=False):
     def find(pos=0):
         try:
             head = input.next()
@@ -126,6 +126,8 @@ def findFirst(predicate, input, direction=None):
             else:
                 return find(pos+1)
         except:
+            if eolIsDelimiter:
+                return pos
             return -1
     return find()
 
@@ -175,7 +177,7 @@ def SwapParams(direction, line, col):
     rightSeparators = rightBrackets + [',']
     if noEnclosingBrackets:
         rightSeparators = [' ']
-    param2end = param2start + findFirst(lambda x: x in rightSeparators, iter(line[param2start:]), RightwardDirection()) - 1
+    param2end = param2start + findFirst(lambda x: x in rightSeparators, iter(line[param2start:]), RightwardDirection(), eolIsDelimiter=True) - 1
 
     if not direction.isBackwards():
         cursorPos = param2end
@@ -221,5 +223,3 @@ map gs @='gb'<cr>
 
 noremap gB :call SwapParams("backwards")<cr>
 map gS @='gB'<cr>
-
-"fun(arg2, arg4, arg3, arg1)
