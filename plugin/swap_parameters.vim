@@ -1,7 +1,7 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " swap_parameters.vim - swap parameters - fun(arg2, arg1, arg3)
 " Author: Kamil Dworakowski <kamil-at-dworakowski.name>
-" Version: 1.1.1
+" Version: 1.1.2
 " Last Change: 2008-01-29 
 " URL: http://blog.kamil.dworakowski.name
 " Requires: Python and Vim compiled with +python option
@@ -96,21 +96,16 @@ class Direction(object):
     def isCloseBracket(self, char):
         return char in self.closingBrackets
 
+    def isBackwards(self):
+        return self.openingBrackets is rightBrackets
 
 class RightwardDirection(Direction):
     openingBrackets = leftBrackets
     closingBrackets = rightBrackets
-    
-    def isBackwards(self):
-        return False
-
 
 class LeftwardDirection(Direction):
     openingBrackets = rightBrackets
     closingBrackets = leftBrackets
-
-    def isBackwards(self):
-        return True
 
 
 def findFirst(predicate, input, direction=None, eolIsDelimiter=False):
@@ -150,7 +145,8 @@ def SwapParams(direction, line, col):
             separator = leftBrackets + [',']
         return findFirst(lambda x: x in separator,
                          prefix,
-                         LeftwardDirection()
+                         LeftwardDirection(),
+                         eolIsDelimiter=True
         ) 
 
     if not direction.isBackwards() and noEnclosingBrackets:
