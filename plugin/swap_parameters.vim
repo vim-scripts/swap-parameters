@@ -1,8 +1,8 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " swap_parameters.vim - swap parameters - fun(arg2, arg1, arg3)
 " Author: Kamil Dworakowski <kamil-at-dworakowski.name>
-" Version: 1.1.2
-" Last Change: 2008-01-29 
+" Version: 1.1.3
+" Last Change: 2008-02-07 
 " URL: http://blog.kamil.dworakowski.name
 " Requires: Python and Vim compiled with +python option
 " Licence: This script is released under the Vim License.
@@ -96,16 +96,24 @@ class Direction(object):
     def isCloseBracket(self, char):
         return char in self.closingBrackets
 
-    def isBackwards(self):
+    def isBackward(self):
         return self.openingBrackets is rightBrackets
+
+    def isForward(self):
+        return not self.isBackward()
+    
 
 class RightwardDirection(Direction):
     openingBrackets = leftBrackets
     closingBrackets = rightBrackets
+    def opposite(self):
+        return LeftwardDirection()
 
 class LeftwardDirection(Direction):
     openingBrackets = rightBrackets
     closingBrackets = leftBrackets
+    def opposite(self):
+        return RightwardDirection()
 
 
 def findFirst(predicate, input, direction=None, eolIsDelimiter=False):
@@ -115,9 +123,9 @@ def findFirst(predicate, input, direction=None, eolIsDelimiter=False):
             if predicate(head):
                 return pos
             elif direction and direction.isOpenBracket(head):
-                afterBracketGroup = \
+                charsInsideBrackets = \
                     findFirst(direction.isCloseBracket, input, direction)
-                return find(pos + afterBracketGroup + 2)
+                return find(pos + charsInsideBrackets+1 + 1)
             else:
                 return find(pos+1)
         except:
@@ -129,37 +137,42 @@ def findFirst(predicate, input, direction=None, eolIsDelimiter=False):
 
 def SwapParams(direction, line, col):
 
-    if direction.isBackwards():
-        noEnclosingBrackets = findFirst(lambda x: x in rightBrackets, iter(line[col:]), RightwardDirection()) == -1
-    else:
-        noEnclosingBrackets = findFirst(lambda x: x in leftBrackets, reversed(line[:col+1]), LeftwardDirection()) == -1
-
-    prefix = reversed(line[:col + 1])
-    toTheLeft = 0
-    if line[col] in leftBrackets:
-        prefix.next()
-        toTheLeft += 1
-
-    def findNextLeftSeparator(separator=None):
-        if not separator:
-            separator = leftBrackets + [',']
-        return findFirst(lambda x: x in separator,
-                         prefix,
-                         LeftwardDirection(),
-                         eolIsDelimiter=True
+    def areThereNoEnclosinBrackets():
+        rightBracketIndex = findFirst(rightBrackets.__contains__,
+                                 iter(line[col:]),
+                                 RightwardDirection()
         ) 
+        return rightBracketIndex == -1
 
-    if not direction.isBackwards() and noEnclosingBrackets:
-        toTheLeft += findNextLeftSeparator(separator=[' '])
-    else:
-        toTheLeft += findNextLeftSeparator()
+    noEncloseBrackets = areThereNoEnclosinBrackets()
 
-    if direction.isBackwards() and noEnclosingBrackets:
-        toTheLeft += 1 + findNextLeftSeparator(separator=[' '])
-    elif direction.isBackwards():
-        toTheLeft += 1 + findNextLeftSeparator()
+    def findTheSeparatorBeforeTheLeftParam():
+        prefixRev = reversed(line[:col+1])
+        toTheLeft = 0
+        if line[col] in leftBrackets:
+            prefixRev.next()
+            toTheLeft += 1
 
-    start = col - toTheLeft + 1
+        def findNextLeftSeparator(separators=leftBrackets+[',']):
+            return findFirst(separators.__contains__,
+                             prefixRev,
+                             LeftwardDirection(),
+                             eolIsDelimiter=True
+            ) 
+
+        if direction.isForward() and noEncloseBrackets:
+            toTheLeft += findNextLeftSeparator(separators=[' '])
+        else:
+            toTheLeft += findNextLeftSeparator()
+
+        if direction.isBackward() and noEncloseBrackets:
+            toTheLeft += 1 + findNextLeftSeparator(separators=[' '])
+        elif direction.isBackward():
+            toTheLeft += 1 + findNextLeftSeparator()
+
+        return col - toTheLeft + 1
+
+    start = findTheSeparatorBeforeTheLeftParam()
 
     nonwhitespace = lambda x: x not in (' ', '\t')
 
@@ -171,11 +184,15 @@ def SwapParams(direction, line, col):
     ) - 1
     param2start = param1end + 2 + findFirst(nonwhitespace, iter(line[param1end+2:]))
     rightSeparators = rightBrackets + [',']
-    if noEnclosingBrackets:
-        rightSeparators = [' ']
-    param2end = param2start + findFirst(lambda x: x in rightSeparators, iter(line[param2start:]), RightwardDirection(), eolIsDelimiter=True) - 1
+    if noEncloseBrackets:
+        rightSeparators = [' ', ',']
+    param2end = param2start - 1 + findFirst(
+                                    rightSeparators.__contains__, 
+                                    iter(line[param2start:]), 
+                                    RightwardDirection(), 
+                                    eolIsDelimiter=True)
 
-    if not direction.isBackwards():
+    if direction.isForward():
         cursorPos = param2end
     else:
         cursorPos = param1start
